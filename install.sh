@@ -131,20 +131,69 @@ main() {
 
     case ":$PATH:" in
         *":$PREFIX:"*)
-            say "Run it with:  vmerge --folder ~/Desktop/clips"
-            ;;
-        *)
-            # Naming the file rather than guessing the shell: a wrong rc file is
-            # worse than none, because nothing happens and there is no error.
-            say "$PREFIX is not on your PATH. Either run it in full:"
-            say ""
-            say "  $PREFIX/vmerge --folder ~/Desktop/clips"
-            say ""
-            say "or add it to your PATH, then reopen Terminal:"
-            say ""
-            say "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc"
+            say "Run it by typing:  vmerge"
+            printf '\n'
+            return 0
             ;;
     esac
+
+    # Not on PATH. Offering to fix it beats printing a line to copy: typing the
+    # full path every time is the friction that makes people ask for the program
+    # to be installed somewhere silly instead.
+    say "$PREFIX is not on your PATH, so \"vmerge\" on its own will not be found."
+    printf '\n'
+
+    # The shell this will belong to, not the one running the installer - `sh`
+    # here is whatever the pipe invoked. A wrong file is worse than none: the
+    # line lands somewhere never read, and nothing happens with no error.
+    case "${SHELL:-}" in
+        */zsh)  rc="$HOME/.zshrc" ;;
+        */bash) rc="$HOME/.bashrc" ;;
+        *)      rc="" ;;
+    esac
+
+    # stdin is the pipe carrying this script, so a plain `read` would swallow
+    # the rest of it rather than wait for a person. /dev/tty is the keyboard.
+    # Without one - a scripted install - nothing is asked and nothing is
+    # written: editing someone's shell config unasked is not a default.
+    # `[ -r /dev/tty ]` is not the test to use: the device node is readable by
+    # its permissions even where there is no controlling terminal to open, so it
+    # passes and the open then fails - printing the question and a shell error
+    # at someone who was never going to be asked. Opening it is the only honest
+    # check.
+    reply=n
+    if [ -n "$rc" ] && { : </dev/tty; } 2>/dev/null; then
+        printf '  Add it to %s so you can just type "vmerge"? [Y/n] ' "$rc"
+        read -r reply </dev/tty || reply=n
+    fi
+
+    case "${reply:-y}" in
+        y|Y|yes|Yes|YES|"")
+            if [ -n "$rc" ]; then
+                # Idempotent: running the installer twice must not leave two
+                # copies of the line in the file.
+                if grep -qsF "$PREFIX" "$rc"; then
+                    say "Already in $rc."
+                else
+                    printf '\n# Added by the vmerge installer\nexport PATH="%s:$PATH"\n' \
+                        "$PREFIX" >> "$rc" || die "Could not write to $rc"
+                    say "Added to $rc."
+                fi
+                printf '\n'
+                say "Open a new Terminal window, then type:  vmerge"
+                printf '\n'
+                return 0
+            fi
+            ;;
+    esac
+
+    say "Run it in full:"
+    say ""
+    say "  $PREFIX/vmerge"
+    say ""
+    say "or add it to your PATH yourself, then reopen Terminal:"
+    say ""
+    say "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ${rc:-~/.zshrc}"
     printf '\n'
 }
 

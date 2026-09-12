@@ -83,9 +83,32 @@ jobs:
           fi
           cat "${{ matrix.asset }}.sha256"
 
+      # The notes are written here rather than by hand at tag time, because a
+      # release page listing four files and no instructions is a release nobody
+      # can install. Both matrix jobs set the same body against the same tag, so
+      # whichever lands second changes nothing.
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          body: |
+            ## Install
+
+            **macOS (Apple Silicon)** — paste this into Terminal:
+
+            ```
+            curl -fsSL https://raw.githubusercontent.com/alee-ibrahim/vmerge/main/install.sh | sh
+            ```
+
+            It fetches the build for your Mac, checks it against the digest
+            published beside it, and sets up ffmpeg. Then run `vmerge`.
+
+            **Windows** — download `MERGE-VIDEOS.exe` below and run it.
+
+            ---
+
+            Every binary has a `.sha256` beside it. The macOS build is not
+            notarised, so downloading it by hand needs `chmod +x` and
+            `xattr -cr` before it will run — the installer above avoids both.
           files: |
             dist/${{ matrix.asset }}
             dist/${{ matrix.asset }}.sha256
