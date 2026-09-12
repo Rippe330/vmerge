@@ -98,29 +98,36 @@ jobs:
 
       # yt-dlp is the other binary this downloads and then runs, and it is the
       # more delicate of the two: yt-dlp_macos is a PyInstaller one-file build,
-      # which carries an archive appended after the Mach-O image. `codesign
-      # --force` across one of those is the step most likely to produce a
-      # binary that installs perfectly and then will not start.
-      - name: Install yt-dlp from a clean state, then run it
+      # carrying an archive appended after the Mach-O image. The ad-hoc
+      # codesign applied to everything installed runs straight across that, and
+      # a signature that lands but invalidates the appended archive would leave
+      # a tool that installs perfectly and then will not start.
+      #
+      # This applies the three steps proc::make_installed_runnable performs
+      # rather than driving the installer itself, because that installer asks
+      # api.github.com which release is newest, and Actions runners share an IP
+      # pool that endpoint rate-limits - the request is refused in under a
+      # second, which would make this a coin toss rather than a check. The
+      # download URL below needs no API call, so what is left is deterministic
+      # and is the part that could actually be wrong.
+      - name: Ad-hoc signing leaves yt-dlp runnable
         run: |
           set -euo pipefail
 
-          rm -rf target/release/yt-dlp "$HOME/Library/Application Support/video-merge/yt-dlp"
+          curl -sSL --retry 3 --max-time 300 \
+            -o "$RUNNER_TEMP/yt-dlp" \
+            https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos
 
-          # Both tools are resolved before the download is attempted, so a link
-          # that cannot possibly work still installs yt-dlp on the way past.
-          # That keeps this off YouTube entirely - no rate limits, no terms to
-          # worry about, and nothing that breaks when a site changes.
-          PATH="$RUNNER_TEMP/nothing:/usr/bin:/bin:/usr/sbin:/sbin" \
-            ./target/release/vmerge --no-update \
-              --download "https://example.com/definitely-not-a-video" || true
+          file "$RUNNER_TEMP/yt-dlp"
 
-          tool=target/release/yt-dlp/yt-dlp
-          test -x "$tool" || { echo "::error::yt-dlp was not installed"; exit 1; }
+          # Exactly what proc::make_installed_runnable does, in the same order.
+          xattr -d com.apple.quarantine "$RUNNER_TEMP/yt-dlp" 2>/dev/null || true
+          chmod 0755 "$RUNNER_TEMP/yt-dlp"
+          codesign --force --sign - "$RUNNER_TEMP/yt-dlp"
 
-          # Where a corrupted appended archive, a missing executable bit, or a
-          # quarantine mark all show themselves.
-          "$tool" --version
+          # A PyInstaller binary whose appended archive was invalidated by that
+          # signature starts and dies here.
+          "$RUNNER_TEMP/yt-dlp" --version
 
   # Not a test run: this only proves the fallbacks for platforms without a build
   # of their own still compile, so that reaching for a Windows or macOS API
