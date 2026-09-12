@@ -34,9 +34,12 @@ pub trait Reporter {
 
 /// How a downloaded archive is packed.
 ///
-/// Both variants stay live on a platform with no download sources of its own:
-/// the tests build archives of each kind whatever they are running on.
-#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
+/// Only the Windows sources name `SevenZ` - gyan.dev is the one publisher here
+/// shipping a 7z - so off Windows the variant is matched but never constructed,
+/// which is dead code as far as the compiler is concerned. The unpacker stays
+/// either way: it is what makes adding a 7z source elsewhere a one-line change,
+/// and deleting it to satisfy a lint would be the tail wagging the dog.
+#[cfg_attr(not(windows), allow(dead_code))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Packing {
     Zip,
