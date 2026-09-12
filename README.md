@@ -47,9 +47,36 @@ Releases carry a build per platform, built from one commit by
 
 **On Windows**, download it and run it.
 
-**On macOS**, the download is not signed by a paid Apple developer account, so
-Gatekeeper refuses it until the quarantine mark is cleared. Once, after
-downloading:
+**On macOS**, one line:
+
+```
+curl -fsSL https://raw.githubusercontent.com/alee-ibrahim/vmerge/main/install.sh | sh
+```
+
+That fetches the build for this Mac, checks it against the digest published
+beside it, installs it to `~/.local/bin/vmerge`, and fetches ffmpeg so the first
+merge starts immediately rather than pausing for a download. `VMERGE_PREFIX`
+picks a different folder; `VMERGE_REPO` a different repository.
+
+### Why a pipe rather than a file to download
+
+Not to be clever, and not to get around Gatekeeper. macOS quarantines anything a
+browser saves, refuses to run it, and passes the mark on to everything unpacked
+from it - so a downloaded zip *cannot* contain a script that clears its own
+quarantine, because the script is quarantined too. Nothing inside the mark can
+lift it.
+
+curl sets no such mark, which makes the pipe the only shape that can do this
+setup at all. The alternative is notarising the build, which needs a paid Apple
+developer account; until someone is paying for one, this is the honest option.
+
+The script refuses to install anything whose checksum does not match, and is
+wrapped in a function called on its last line, so a connection cut halfway
+leaves a truncated file that does nothing rather than a half-run install.
+
+**By hand instead**, if you would rather not pipe a script into a shell - which
+is a perfectly reasonable thing to prefer. Download `MERGE-VIDEOS-macos-arm64`
+from the releases page, then:
 
 ```
 chmod +x MERGE-VIDEOS-macos-arm64
@@ -57,10 +84,11 @@ xattr -cr MERGE-VIDEOS-macos-arm64
 ./MERGE-VIDEOS-macos-arm64
 ```
 
-This is the same step the ffmpeg builds this installs ask for, and it is doing
-the honest thing: nobody has vouched for this binary, and macOS is saying so.
-The program clears the same mark from the tools it downloads itself, so that is
-the only time it has to be done by hand.
+The `xattr` line is clearing exactly the mark described above. It is the same
+step the ffmpeg builds this installs ask for, and it is macOS doing the honest
+thing: nobody has vouched for this binary, and it is saying so. The program
+clears the same mark from the tools it downloads itself, so this is the only
+time it has to be done by hand.
 
 ### Building it yourself
 
