@@ -55,6 +55,30 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
 
+      # The tag and the crate version have to agree. update.rs reads
+      # CARGO_PKG_VERSION to decide what counts as an upgrade, so a binary
+      # announcing a version its release does not carry is how a self-updater
+      # ends up reinstalling itself on every start. Bumping Cargo.toml is a
+      # manual step with nothing tying it to the tag, and it has drifted more
+      # than once - so the mismatch fails here, loudly, rather than shipping.
+      #
+      # Checked before the toolchain and the build, because a wrong tag should
+      # cost seconds rather than two minutes of compiling. Rewriting Cargo.toml
+      # from the tag instead was the obvious alternative and the wrong one: a
+      # build that edits its own source produces a binary matching no commit
+      # anyone can check out.
+      - name: Tag and Cargo.toml must agree
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          crate=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          if [ "$tag" != "v$crate" ]; then
+            echo "::error::Tag $tag does not match Cargo.toml $crate. Expected v$crate."
+            exit 1
+          fi
+          echo "$tag matches Cargo.toml."
+
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
