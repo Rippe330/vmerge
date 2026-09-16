@@ -83,6 +83,54 @@ jobs:
           fi
           cat "${{ matrix.asset }}.sha256"
 
+      # A .dmg is the shape Mac users recognise, and hdiutil needs no Apple
+      # account - only notarisation does, and that is a different thing. So
+      # this makes the release page look like a Mac release; it does not make
+      # Gatekeeper any quieter, because the quarantine mark passes from the
+      # downloaded image to whatever is copied out of it. Hence the Read Me
+      # travelling inside rather than living only on the release page.
+      - name: Disk image (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          stage=$(mktemp -d)
+          # Named for what it will be once copied out, not for the release
+          # asset it came from.
+          cp "dist/${{ matrix.asset }}" "$stage/vmerge"
+
+          cat > "$stage/Read Me.txt" <<'TXT'
+          vmerge - joins video clips into one .mp4
+
+          This is a terminal program. There is no window to double-click and
+          nothing to drag to Applications: you run it by typing its name in
+          Terminal.
+
+          It is also not notarised by Apple, so macOS will refuse to run it
+          until the download mark is cleared. Copy vmerge somewhere you want
+          it, then in Terminal:
+
+              chmod +x /path/to/vmerge
+              xattr -cr /path/to/vmerge
+              /path/to/vmerge
+
+          Dragging the file into the Terminal window fills in its path.
+
+          Easier: skip this disk image and run
+
+              curl -fsSL https://raw.githubusercontent.com/alee-ibrahim/vmerge/main/install.sh | sh
+
+          which does all of the above, installs ffmpeg, and can put vmerge on
+          your PATH so the name alone is enough.
+          TXT
+
+          hdiutil create -volname vmerge -srcfolder "$stage" \
+            -ov -format UDZO "dist/${{ matrix.asset }}.dmg"
+
+          cd dist
+          shasum -a 256 "${{ matrix.asset }}.dmg" | cut -d' ' -f1 \
+            > "${{ matrix.asset }}.dmg.sha256"
+
       # The notes are written here rather than by hand at tag time, because a
       # release page listing four files and no instructions is a release nobody
       # can install. Both matrix jobs set the same body against the same tag, so
@@ -100,7 +148,15 @@ jobs:
             ```
 
             It fetches the build for your Mac, checks it against the digest
-            published beside it, and sets up ffmpeg. Then run `vmerge`.
+            published beside it, sets up ffmpeg, and offers to add
+            `~/.local/bin` to your PATH.
+
+            If you said yes, open a new Terminal window and type `vmerge`.
+            If you said no, run `~/.local/bin/vmerge`.
+
+            Prefer a download? The `.dmg` below holds the same binary with a
+            Read Me. It is not notarised, so it needs `chmod +x` and
+            `xattr -cr` first - the installer above avoids that.
 
             **Windows** — download `MERGE-VIDEOS.exe` below and run it.
 
@@ -112,3 +168,5 @@ jobs:
           files: |
             dist/${{ matrix.asset }}
             dist/${{ matrix.asset }}.sha256
+            dist/*.dmg
+            dist/*.dmg.sha256
