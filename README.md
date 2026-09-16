@@ -58,6 +58,15 @@ beside it, installs it to `~/.local/bin/vmerge`, and fetches ffmpeg so the first
 merge starts immediately rather than pausing for a download. `VMERGE_PREFIX`
 picks a different folder; `VMERGE_REPO` a different repository.
 
+It offers to put `~/.local/bin` on your PATH. If you accept, open a new Terminal
+window and type `vmerge`; if you decline, run `~/.local/bin/vmerge`. A shell only
+reads its startup file when it opens, which is why the window you installed from
+will not know the name yet.
+
+Releases also carry a `.dmg` holding the same binary with a Read Me, for anyone
+who would rather download than pipe a script into a shell. It is not notarised
+either, so it needs the same `chmod +x` and `xattr -cr`.
+
 ### Why a pipe rather than a file to download
 
 Not to be clever, and not to get around Gatekeeper. macOS quarantines anything a
